@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
-      # url: ${{ github.ref == 'refs/heads/main' && steps.deploy.outputs.deployment-url || steps.deploy.outputs.deployment-url }}
-      url: ${{steps.deploy.outputs.deployment-url }}
+      # Need to add "https://" to the deployment URL (gomon.rowentey.xyz) to make it a valid URL
+      url: ${{ format('https://{0}', steps.deploy.outputs.deployment-url) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
