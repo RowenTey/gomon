@@ -219,7 +219,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 	key := models.GetKey(url)
 	if err := h.storage.GetJSON(key, &website); err != nil {
 		badge.Message = "UNKNOWN"
-		badge.Color = "RED"
+		badge.Color = "red"
 		SendJSONResponse(w, http.StatusNotFound, badge)
 		return
 	}
@@ -229,13 +229,13 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 	// Set color based on status
 	switch website.Status {
 	case models.StatusUp:
-		badge.Color = "GREEN"
+		badge.Color = "green"
 	case models.StatusUnknown:
-		badge.Color = "RED"
+		badge.Color = "red"
 	case models.StatusDown:
-		badge.Color = "RED"
+		badge.Color = "red"
 	case models.StatusDegraded:
-		badge.Color = "ORANGE"
+		badge.Color = "orange"
 	}
 
 	// Directly send the badge as JSON response so Shields.io can use it
