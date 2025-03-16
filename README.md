@@ -4,7 +4,7 @@
 
 ## 🛠 Getting Started
 > [!IMPORTANT] 
-> Make sure you have `tinygo` installed as this project requires it to compile to **WASM** for Cloudflare Workers
+> Make sure you have [`tinygo`](https://tinygo.org/getting-started/install/) installed as this project requires it to compile to **WASM** for Cloudflare Workers
 
 1\. Install dependencies
 
@@ -12,13 +12,22 @@
 go mod tidy
 ```
 
-2\. Create a `KV namespace`
+2\. Create a KV `namespace`
 
 ```terminal
 npx wrangler kv namespace create <YOUR-NAMESPACE> 
 ```
 
 3\. Update the **BINDING_NAME** and **BINDING_ID** values in the `wrangler.jsonc` file
+
+```
+"kv_namespaces": [
+  {
+    "binding": "<BINDING_NAME>",
+    "id": "<BINDING_ID>"
+  }
+]
+```
 
 4\. Run the worker locally 
 
