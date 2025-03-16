@@ -14,7 +14,7 @@ jobs:
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
       # Need to add "https://" to the deployment URL on production (gomon.rowentey.xyz) to make it a valid URL
-      url: ${{ github.ref == 'refs/heads/main' && format('https://{0}', steps.deploy.outputs.deployment-url) || steps.deploy.outputs.deployment-url}}
+      url: ${{ github.ref == 'refs/heads/main' && format('https://{0}', steps.clean-url.outputs.cleaned-url) || steps.deploy.outputs.deployment-url}}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,6 +32,15 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wranglerVersion: "4.0.0"
           command: ${{ github.ref == 'refs/heads/main' && 'deploy' || 'versions upload' }}
+
+      - name: Remove trailing " (custom domain)" from deployment URL
+        id: clean-url
+        if: contains(steps.deploy.outputs.deployment-url, ' (custom domain)')
+        run: |
+          # sed "s/old/new" replaces "old" with "new" 
+          CLEANED_URL=$(echo "${{ steps.deploy.outputs.deployment-url }}" | sed 's/ (custom domain)//')
+          echo "Clean URL: $CLEANED_URL"
+          echo "cleaned-url=$CLEANED_URL" >> $GITHUB_OUTPUT
 
       - name: Print Wrangler command output
         env:
