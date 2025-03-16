@@ -230,6 +230,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 	case models.StatusUp:
 		badge.Color = "green"
 	case models.StatusUnknown:
+		badge.Color = "red"
 	case models.StatusDown:
 		badge.Color = "red"
 	case models.StatusDegraded:
