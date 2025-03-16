@@ -5,6 +5,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/RowenTey/gomon/src/models"
@@ -223,7 +224,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	badge.Message = string(website.Status)
+	badge.Message = strings.ToUpper(string(website.Status))
 
 	// Set color based on status
 	switch website.Status {
