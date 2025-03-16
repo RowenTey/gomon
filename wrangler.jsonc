@@ -14,10 +14,11 @@
 		"enabled": true
 	},
 	"triggers": {
-		"crons": ["* * * * *"]
+		"crons": ["*/5 * * * *"]
 	},
 	"vars": {
-		"KV_NAMESPACE": "gomon"
+		"KV_NAMESPACE": "gomon",
+		"MIN_FREQUENCY": "300" // in seconds
 	},
 	"routes": [
 		{
