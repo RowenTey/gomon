@@ -31,7 +31,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wranglerVersion: "4.0.0"
-          command: deploy --env ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+          command: ${{ github.ref == 'refs/heads/main' && 'deploy' || 'versions upload' }}
 
       - name: Print Wrangler command output
         env:

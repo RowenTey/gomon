@@ -19,6 +19,12 @@
 	"vars": {
 		"KV_NAMESPACE": "gomon"
 	},
+	"routes": [
+		{
+		  "pattern": "gomon.rowentey.xyz",
+		  "custom_domain": true
+		}
+	],
 	"kv_namespaces": [
 		{
 			"binding": "gomon",
