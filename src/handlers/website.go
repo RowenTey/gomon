@@ -13,12 +13,14 @@ import (
 )
 
 type WebsiteHandler struct {
-	storage storage.KVStorage
+	minFrequency int
+	storage      storage.KVStorage
 }
 
-func NewWebsiteHandler(kvStorage storage.KVStorage) *WebsiteHandler {
+func NewWebsiteHandler(minFrequency int, kvStorage storage.KVStorage) *WebsiteHandler {
 	return &WebsiteHandler{
-		storage: kvStorage,
+		minFrequency: minFrequency,
+		storage:      kvStorage,
 	}
 }
 
@@ -42,8 +44,8 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Frequency <= 60 {
-		req.Frequency = 60 // Minimum 60 seconds
+	if req.Frequency <= h.minFrequency {
+		req.Frequency = h.minFrequency
 	}
 
 	// Check if website already exists
@@ -130,8 +132,8 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 
 	// Update website
 	website.Frequency = req.Frequency
-	if req.Frequency <= 60 {
-		req.Frequency = 60 // Minimum 60 seconds
+	if req.Frequency <= h.minFrequency {
+		req.Frequency = h.minFrequency
 	}
 
 	// Save to KV

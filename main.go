@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/RowenTey/gomon/src/handlers"
 	"github.com/RowenTey/gomon/src/models"
@@ -25,8 +26,14 @@ func main() {
 		panic(err)
 	}
 
+	minFrequencyStr := cloudflare.Getenv("MIN_FREQUENCY")
+	minFrequency, err := strconv.Atoi(minFrequencyStr)
+	if err != nil {
+		panic(err)
+	}
+
 	// Initialize website handler
-	websiteHandler := handlers.NewWebsiteHandler(kvStorage)
+	websiteHandler := handlers.NewWebsiteHandler(minFrequency, kvStorage)
 
 	// Register API routes
 	// Create a single handler function for all routes

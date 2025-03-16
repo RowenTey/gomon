@@ -100,7 +100,7 @@ func (m *Monitor) checkWebsite(website *models.Website) {
 		return
 	}
 
-	// Set User-Agent to identify our monitoring tool
+	// Set User-Agent to identify
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/111.0")
 
 	resp, err := cli.Do(req, nil)
