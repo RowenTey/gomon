@@ -54,8 +54,6 @@ npm start
 ├── src/                  # go packages
 ├── main.go               # entrypoint
 ├── wrangler.jsonc        # cloudflare worker configuration
-├── .gitignore
-└── README.md
 ```
 
 ## ❗ Constraints
