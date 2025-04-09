@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	GREEN_HEX = "959DA5"
+	GREEN_HEX = "33D058"
 )
 
 type WebsiteHandler struct {
