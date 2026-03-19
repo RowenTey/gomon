@@ -3,8 +3,11 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,13 +17,13 @@ import (
 
 type WebsiteHandler struct {
 	minFrequency int
-	storage      storage.KVStorage
+	storage      storage.Storage
 }
 
-func NewWebsiteHandler(minFrequency int, kvStorage storage.KVStorage) *WebsiteHandler {
+func NewWebsiteHandler(minFrequency int, appStorage storage.Storage) *WebsiteHandler {
 	return &WebsiteHandler{
 		minFrequency: minFrequency,
-		storage:      kvStorage,
+		storage:      appStorage,
 	}
 }
 
@@ -48,10 +51,16 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		req.Frequency = h.minFrequency
 	}
 
+	if err := validateWebhookRequest(req.WebhookEnabled, req.WebhookURL); err != nil {
+		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
 	// Check if website already exists
-	var existingWebsite models.Website
-	key := models.GetKey(req.URL)
-	err := h.storage.GetJSON(key, &existingWebsite)
+	_, err := h.storage.GetWebsite(req.URL)
 	if err == nil {
 		SendJSONResponse(w, http.StatusConflict, models.APIResponse{
 			Success: false,
@@ -59,25 +68,34 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if err != sql.ErrNoRows {
+		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to check existing website",
+		})
+		return
+	}
 
 	// Create new website
 	now := time.Now().Unix()
 	website := models.Website{
-		URL:           req.URL,
-		Frequency:     req.Frequency,
-		CreatedAt:     now,
-		Status:        models.StatusUnknown,
-		LastCheckedAt: 0,  // Never checked
-		ResponseTime:  -1, // No response time yet
-		StatusCode:    -1, // No status code yet
-		Error:         "", // No error yet
+		URL:                    req.URL,
+		Frequency:              req.Frequency,
+		CreatedAt:              now,
+		Status:                 models.StatusUnknown,
+		LastCheckedAt:          0,
+		ResponseTime:           -1,
+		StatusCode:             -1,
+		Error:                  "",
+		WebhookEnabled:         req.WebhookEnabled,
+		WebhookURL:             req.WebhookURL,
+		WebhookPayloadTemplate: req.WebhookPayloadTemplate,
 	}
 
-	// Save to KV
-	if err := h.storage.PutJSON(key, website); err != nil {
+	if err := h.storage.CreateWebsite(website); err != nil {
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   "Failed to save website configuration",
+			Error:   "Failed to save website",
 		})
 		return
 	}
@@ -91,10 +109,8 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 
 // GetWebsite handles GET requests to retrieve a website configuration
 func (h *WebsiteHandler) GetWebsite(w http.ResponseWriter, r *http.Request, url string) {
-	// Get website config from KV
-	var website models.Website
-	key := models.GetKey(url)
-	if err := h.storage.GetJSON(key, &website); err != nil {
+	website, err := h.storage.GetWebsite(url)
+	if err != nil {
 		SendJSONResponse(w, http.StatusNotFound, models.APIResponse{
 			Success: false,
 			Error:   "Website not found",
@@ -110,10 +126,8 @@ func (h *WebsiteHandler) GetWebsite(w http.ResponseWriter, r *http.Request, url 
 }
 
 func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, url string) {
-	// Get website config from KV
-	var website models.Website
-	key := models.GetKey(url)
-	if err := h.storage.GetJSON(key, &website); err != nil {
+	website, err := h.storage.GetWebsite(url)
+	if err != nil {
 		SendJSONResponse(w, http.StatusNotFound, models.APIResponse{
 			Success: false,
 			Error:   "Website not found",
@@ -121,7 +135,7 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 
-	var req models.CreateWebsiteRequest
+	var req models.UpdateWebsiteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
@@ -130,17 +144,35 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 
-	// Update website
-	website.Frequency = req.Frequency
-	if req.Frequency <= h.minFrequency {
-		req.Frequency = h.minFrequency
+	if req.Frequency != nil {
+		frequency := *req.Frequency
+		if frequency <= h.minFrequency {
+			frequency = h.minFrequency
+		}
+		website.Frequency = frequency
 	}
 
-	// Save to KV
-	if err := h.storage.PutJSON(key, website); err != nil {
+	if req.WebhookEnabled != nil {
+		website.WebhookEnabled = *req.WebhookEnabled
+	}
+	if req.WebhookURL != nil {
+		website.WebhookURL = *req.WebhookURL
+	}
+	if req.WebhookPayloadTemplate != nil {
+		website.WebhookPayloadTemplate = *req.WebhookPayloadTemplate
+	}
+	if err := validateWebhookRequest(website.WebhookEnabled, website.WebhookURL); err != nil {
+		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	if err := h.storage.UpdateWebsite(*website); err != nil {
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   "Failed to update website configuration",
+			Error:   "Failed to update website",
 		})
 		return
 	}
@@ -151,11 +183,8 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 		Data:    website,
 	})
 }
-
 func (h *WebsiteHandler) DeleteWebsite(w http.ResponseWriter, r *http.Request, url string) {
-	// Get website config from KV
-	key := models.GetKey(url)
-	if err := h.storage.Delete(key); err != nil {
+	if err := h.storage.DeleteWebsite(url); err != nil {
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to delete website",
@@ -171,26 +200,13 @@ func (h *WebsiteHandler) DeleteWebsite(w http.ResponseWriter, r *http.Request, u
 
 // ListWebsites handles GET requests to retrieve all websites
 func (h *WebsiteHandler) ListWebsites(w http.ResponseWriter, r *http.Request) {
-	// Get all website keys from KV
-	keys, err := h.storage.List("websites_", 1000) // Limit to 1000 websites
+	websites, err := h.storage.ListWebsites(1000)
 	if err != nil {
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to list websites",
 		})
 		return
-	}
-
-	websites := []models.Website{}
-
-	// Get each website
-	for _, key := range keys {
-		var website models.Website
-		if err := h.storage.GetJSON(key, &website); err != nil {
-			// Skip if we can't retrieve this website
-			continue
-		}
-		websites = append(websites, website)
 	}
 
 	SendJSONResponse(w, http.StatusOK, models.APIResponse{
@@ -216,10 +232,8 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 		Label:         "STATUS",
 	}
 
-	// Get website config from KV
-	var website models.Website
-	key := models.GetKey(url)
-	if err := h.storage.GetJSON(key, &website); err != nil {
+	website, err := h.storage.GetWebsite(url)
+	if err != nil {
 		badge.Message = "UNKNOWN"
 		badge.Color = "red"
 		SendJSONResponse(w, http.StatusNotFound, badge)
@@ -242,6 +256,20 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 
 	// Directly send the badge as JSON response so Shields.io can use it
 	SendJSONResponse(w, http.StatusOK, badge)
+}
+
+func validateWebhookRequest(enabled bool, webhookURL string) error {
+	if !enabled {
+		return nil
+	}
+	if webhookURL == "" {
+		return errors.New("webhookUrl is required when webhookEnabled is true")
+	}
+	parsed, err := url.ParseRequestURI(webhookURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("webhookUrl must be a valid http/https URL")
+	}
+	return nil
 }
 
 // Helper function to send JSON responses

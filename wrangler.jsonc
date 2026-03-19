@@ -17,8 +17,13 @@
 		"crons": ["*/5 * * * *"]
 	},
 	"vars": {
-		"KV_NAMESPACE": "gomon",
-		"MIN_FREQUENCY": "300" // in seconds
+		"D1_BINDING": "DB",
+		"MIN_FREQUENCY": "300", // in seconds
+		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
+		"WEBHOOK_MAX_ATTEMPTS": "3",
+		"WEBHOOK_INITIAL_DELAY_SEC": "30",
+		"WEBHOOK_MAX_DELAY_SEC": "300",
+		"WEBHOOK_BACKOFF_FACTOR": "2"
 	},
 	"routes": [
 		{
@@ -26,10 +31,12 @@
 		  "custom_domain": true
 		}
 	],
-	"kv_namespaces": [
+	"d1_databases": [
 		{
-			"binding": "gomon",
-			"id": "598b9e922500477494770aee2ed01b17"
+			"binding": "DB",
+			"database_name": "gomon",
+			"database_id": "7b05cf24-7237-4b25-a42f-964b51e19ccd",
+			"migrations_dir": "migrations"
 		}
 	]
 }

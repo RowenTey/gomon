@@ -20,8 +20,13 @@ import (
 func main() {
 	log.Println("Starting gomon...")
 
-	// Initialize KV storage for websites and monitoring results
-	kvStorage, err := storage.NewKVStorage(cloudflare.Getenv("KV_NAMESPACE"))
+	// Initialize D1 storage for websites and webhook queue.
+	bindingName := cloudflare.Getenv("D1_BINDING")
+	if bindingName == "" {
+		bindingName = "DB"
+	}
+
+	d1Storage, err := storage.NewD1Storage(bindingName)
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +38,16 @@ func main() {
 	}
 
 	// Initialize website handler
-	websiteHandler := handlers.NewWebsiteHandler(minFrequency, kvStorage)
+	websiteHandler := handlers.NewWebsiteHandler(minFrequency, d1Storage)
+
+	webhookConfig := models.WebhookRuntimeConfig{
+		NotifyOnRecovery: parseBoolWithDefault(cloudflare.Getenv("WEBHOOK_NOTIFY_ON_RECOVERY"), true),
+		MaxAttempts:      parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_ATTEMPTS"), 3),
+		InitialDelaySec:  parseIntWithDefault(cloudflare.Getenv("WEBHOOK_INITIAL_DELAY_SEC"), 30),
+		MaxDelaySec:      parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_DELAY_SEC"), 300),
+		BackoffFactor:    parseFloatWithDefault(cloudflare.Getenv("WEBHOOK_BACKOFF_FACTOR"), 2.0),
+	}
+	webhookConfig.ApplyDefaults()
 
 	// Register API routes
 	// Create a single handler function for all routes
@@ -133,7 +147,7 @@ func main() {
 		log.Println("CRON ran at:", e.ScheduledTime.Format("02-01-2006 15:04:05"))
 
 		// Initialize monitor and start monitoring routine
-		monitor := monitoring.NewMonitor(kvStorage)
+		monitor := monitoring.NewMonitor(d1Storage, webhookConfig)
 		monitor.StartMonitoring()
 		return nil
 	}
@@ -149,4 +163,37 @@ func main() {
 	case <-cron.Done():
 		log.Println("Shutting down...")
 	}
+}
+
+func parseIntWithDefault(raw string, defaultValue int) int {
+	if raw == "" {
+		return defaultValue
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return v
+}
+
+func parseFloatWithDefault(raw string, defaultValue float64) float64 {
+	if raw == "" {
+		return defaultValue
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return v
+}
+
+func parseBoolWithDefault(raw string, defaultValue bool) bool {
+	if raw == "" {
+		return defaultValue
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return v
 }
