@@ -15,6 +15,10 @@ import (
 	"github.com/RowenTey/gomon/src/storage"
 )
 
+const (
+	GREEN_HEX = "33D058"
+)
+
 type WebsiteHandler struct {
 	minFrequency int
 	storage      storage.Storage
@@ -245,7 +249,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 	// Set color based on status
 	switch website.Status {
 	case models.StatusUp:
-		badge.Color = "green"
+		badge.Color = GREEN_HEX
 	case models.StatusUnknown:
 		badge.Color = "red"
 	case models.StatusDown:
