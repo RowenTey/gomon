@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 	"time"
@@ -54,8 +55,8 @@ func (d *D1Storage) CreateWebsite(website models.Website) error {
 		context.Background(),
 		`INSERT INTO websites (
 			url, frequency, last_checked_at, created_at, updated_at, status, response_time, status_code, error,
-			webhook_enabled, webhook_url, webhook_payload_template
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		website.URL,
 		website.Frequency,
 		website.LastCheckedAt,
@@ -65,6 +66,7 @@ func (d *D1Storage) CreateWebsite(website models.Website) error {
 		website.ResponseTime,
 		website.StatusCode,
 		website.Error,
+		headersToJSON(website.CustomHeaders),
 		boolToInt(website.WebhookEnabled),
 		website.WebhookURL,
 		website.WebhookPayloadTemplate,
@@ -74,11 +76,12 @@ func (d *D1Storage) CreateWebsite(website models.Website) error {
 
 func (d *D1Storage) GetWebsite(url string) (*models.Website, error) {
 	website := models.Website{}
+	var customHeadersJSON string
 	err := d.db.QueryRowContext(
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
 		FROM websites
 		WHERE url = ?`,
 		url,
@@ -91,6 +94,7 @@ func (d *D1Storage) GetWebsite(url string) (*models.Website, error) {
 		&website.ResponseTime,
 		&website.StatusCode,
 		&website.Error,
+		&customHeadersJSON,
 		(*intBool)(&website.WebhookEnabled),
 		&website.WebhookURL,
 		&website.WebhookPayloadTemplate,
@@ -98,6 +102,7 @@ func (d *D1Storage) GetWebsite(url string) (*models.Website, error) {
 	if err != nil {
 		return nil, err
 	}
+	website.CustomHeaders = parseHeadersJSON(customHeadersJSON)
 	return &website, nil
 }
 
@@ -107,7 +112,7 @@ func (d *D1Storage) UpdateWebsite(website models.Website) error {
 		context.Background(),
 		`UPDATE websites
 		SET frequency = ?, last_checked_at = ?, updated_at = ?, status = ?, response_time = ?, status_code = ?, error = ?,
-			webhook_enabled = ?, webhook_url = ?, webhook_payload_template = ?
+			custom_headers = ?, webhook_enabled = ?, webhook_url = ?, webhook_payload_template = ?
 		WHERE url = ?`,
 		website.Frequency,
 		website.LastCheckedAt,
@@ -116,6 +121,7 @@ func (d *D1Storage) UpdateWebsite(website models.Website) error {
 		website.ResponseTime,
 		website.StatusCode,
 		website.Error,
+		headersToJSON(website.CustomHeaders),
 		boolToInt(website.WebhookEnabled),
 		website.WebhookURL,
 		website.WebhookPayloadTemplate,
@@ -134,7 +140,7 @@ func (d *D1Storage) ListWebsites(limit int) ([]models.Website, error) {
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
 		FROM websites
 		ORDER BY created_at DESC
 		LIMIT ?`,
@@ -148,6 +154,7 @@ func (d *D1Storage) ListWebsites(limit int) ([]models.Website, error) {
 	websites := make([]models.Website, 0)
 	for rows.Next() {
 		website := models.Website{}
+		var customHeadersJSON string
 		if err := rows.Scan(
 			&website.URL,
 			&website.Frequency,
@@ -157,12 +164,14 @@ func (d *D1Storage) ListWebsites(limit int) ([]models.Website, error) {
 			&website.ResponseTime,
 			&website.StatusCode,
 			&website.Error,
+			&customHeadersJSON,
 			(*intBool)(&website.WebhookEnabled),
 			&website.WebhookURL,
 			&website.WebhookPayloadTemplate,
 		); err != nil {
 			return nil, err
 		}
+		website.CustomHeaders = parseHeadersJSON(customHeadersJSON)
 		websites = append(websites, website)
 	}
 
@@ -174,7 +183,7 @@ func (d *D1Storage) ListWebsitesDueForCheck(now int64, limit int) ([]models.Webs
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
 		FROM websites
 		WHERE last_checked_at = 0 OR (? - last_checked_at) >= frequency
 		ORDER BY last_checked_at ASC
@@ -190,6 +199,7 @@ func (d *D1Storage) ListWebsitesDueForCheck(now int64, limit int) ([]models.Webs
 	websites := make([]models.Website, 0)
 	for rows.Next() {
 		website := models.Website{}
+		var customHeadersJSON string
 		if err := rows.Scan(
 			&website.URL,
 			&website.Frequency,
@@ -199,12 +209,14 @@ func (d *D1Storage) ListWebsitesDueForCheck(now int64, limit int) ([]models.Webs
 			&website.ResponseTime,
 			&website.StatusCode,
 			&website.Error,
+			&customHeadersJSON,
 			(*intBool)(&website.WebhookEnabled),
 			&website.WebhookURL,
 			&website.WebhookPayloadTemplate,
 		); err != nil {
 			return nil, err
 		}
+		website.CustomHeaders = parseHeadersJSON(customHeadersJSON)
 		websites = append(websites, website)
 	}
 
@@ -322,6 +334,31 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+func headersToJSON(headers map[string]string) string {
+	if len(headers) == 0 {
+		return "{}"
+	}
+	encoded, err := json.Marshal(headers)
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
+}
+
+func parseHeadersJSON(raw string) map[string]string {
+	if raw == "" {
+		return nil
+	}
+	headers := map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &headers); err != nil {
+		return nil
+	}
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
 }
 
 type intBool bool

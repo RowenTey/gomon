@@ -58,6 +58,15 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		req.Frequency = h.minFrequency
 	}
 
+	if err := validateCustomHeaders(req.CustomHeaders); err != nil {
+		logErrorf("CreateWebsite: invalid custom headers for url=%s: %v", req.URL, err)
+		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
 	if err := validateWebhookRequest(req.WebhookEnabled, req.WebhookURL); err != nil {
 		logErrorf("CreateWebsite: invalid webhook config for url=%s: %v", req.URL, err)
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
@@ -97,6 +106,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		ResponseTime:           -1,
 		StatusCode:             -1,
 		Error:                  "",
+		CustomHeaders:          req.CustomHeaders,
 		WebhookEnabled:         req.WebhookEnabled,
 		WebhookURL:             req.WebhookURL,
 		WebhookPayloadTemplate: req.WebhookPayloadTemplate,
@@ -164,6 +174,17 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 			frequency = h.minFrequency
 		}
 		website.Frequency = frequency
+	}
+	if req.CustomHeaders != nil {
+		if err := validateCustomHeaders(*req.CustomHeaders); err != nil {
+			logErrorf("UpdateWebsite: invalid custom headers for url=%s: %v", url, err)
+			SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
+				Success: false,
+				Error:   err.Error(),
+			})
+			return
+		}
+		website.CustomHeaders = *req.CustomHeaders
 	}
 
 	if req.WebhookEnabled != nil {
@@ -288,6 +309,22 @@ func validateWebhookRequest(enabled bool, webhookURL string) error {
 	parsed, err := url.ParseRequestURI(webhookURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return errors.New("webhookUrl must be a valid http/https URL")
+	}
+	return nil
+}
+
+func validateCustomHeaders(headers map[string]string) error {
+	for key, value := range headers {
+		name := strings.TrimSpace(key)
+		if name == "" {
+			return errors.New("customHeaders cannot contain empty header names")
+		}
+		if strings.EqualFold(name, "host") {
+			return errors.New("customHeaders cannot override Host header")
+		}
+		if strings.TrimSpace(value) == "" {
+			return errors.New("customHeaders cannot contain empty header values")
+		}
 	}
 	return nil
 }

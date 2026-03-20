@@ -110,6 +110,9 @@ func (m *Monitor) checkWebsite(website *models.Website, config models.WebhookRun
 
 	// Set User-Agent to identify
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/111.0")
+	for key, value := range website.CustomHeaders {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := cli.Do(req, nil)
 	responseTime := int(time.Since(startTime).Milliseconds())

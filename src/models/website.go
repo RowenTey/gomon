@@ -8,14 +8,15 @@ import (
 
 // Website represents a monitored website configuration
 type Website struct {
-	URL           string     `json:"url"`
-	Frequency     int        `json:"frequency"` // in seconds
-	LastCheckedAt int64      `json:"lastCheckedAt,omitempty"`
-	CreatedAt     int64      `json:"createdAt"`
-	Status        StatusType `json:"status"`
-	ResponseTime  int        `json:"responseTime,omitempty"` // in milliseconds
-	StatusCode    int        `json:"statusCode"`
-	Error         string     `json:"error,omitempty"`
+	URL           string            `json:"url"`
+	Frequency     int               `json:"frequency"` // in seconds
+	LastCheckedAt int64             `json:"lastCheckedAt,omitempty"`
+	CreatedAt     int64             `json:"createdAt"`
+	Status        StatusType        `json:"status"`
+	ResponseTime  int               `json:"responseTime,omitempty"` // in milliseconds
+	StatusCode    int               `json:"statusCode"`
+	Error         string            `json:"error,omitempty"`
+	CustomHeaders map[string]string `json:"customHeaders,omitempty"`
 
 	WebhookEnabled         bool   `json:"webhookEnabled"`
 	WebhookURL             string `json:"webhookUrl,omitempty"`
@@ -34,19 +35,21 @@ const (
 
 // CreateWebsiteRequest represents the payload for creating a new website to monitor
 type CreateWebsiteRequest struct {
-	URL                    string `json:"url"`
-	Frequency              int    `json:"frequency"` // in seconds
-	WebhookEnabled         bool   `json:"webhookEnabled"`
-	WebhookURL             string `json:"webhookUrl"`
-	WebhookPayloadTemplate string `json:"webhookPayloadTemplate"`
+	URL                    string            `json:"url"`
+	Frequency              int               `json:"frequency"` // in seconds
+	CustomHeaders          map[string]string `json:"customHeaders"`
+	WebhookEnabled         bool              `json:"webhookEnabled"`
+	WebhookURL             string            `json:"webhookUrl"`
+	WebhookPayloadTemplate string            `json:"webhookPayloadTemplate"`
 }
 
 // UpdateWebsiteRequest represents editable website fields.
 type UpdateWebsiteRequest struct {
-	Frequency              *int    `json:"frequency,omitempty"`
-	WebhookEnabled         *bool   `json:"webhookEnabled,omitempty"`
-	WebhookURL             *string `json:"webhookUrl,omitempty"`
-	WebhookPayloadTemplate *string `json:"webhookPayloadTemplate,omitempty"`
+	Frequency              *int               `json:"frequency,omitempty"`
+	CustomHeaders          *map[string]string `json:"customHeaders,omitempty"`
+	WebhookEnabled         *bool              `json:"webhookEnabled,omitempty"`
+	WebhookURL             *string            `json:"webhookUrl,omitempty"`
+	WebhookPayloadTemplate *string            `json:"webhookPayloadTemplate,omitempty"`
 }
 
 // WebhookRuntimeConfig is global webhook behavior shared by all websites.
