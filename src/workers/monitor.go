@@ -217,6 +217,7 @@ func (m *Monitor) processWebhookDeliveries() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		req, err := fetch.NewRequest(ctx, http.MethodPost, delivery.WebhookURL, strings.NewReader(delivery.Payload))
 		if err != nil {
+			log.Printf("Error creating webhook request for %s: %v\n", delivery.WebhookURL, err)
 			cancel()
 			m.scheduleFailureRetry(delivery, err.Error())
 			continue
@@ -226,6 +227,7 @@ func (m *Monitor) processWebhookDeliveries() {
 		resp, err := cli.Do(req, nil)
 		cancel()
 		if err != nil {
+			log.Printf("Error sending webhook request for %s: %v\n", delivery.WebhookURL, err)
 			m.scheduleFailureRetry(delivery, err.Error())
 			continue
 		}
@@ -238,6 +240,7 @@ func (m *Monitor) processWebhookDeliveries() {
 			continue
 		}
 
+		log.Printf("Received non-2xx response for webhook %s: %d\n", delivery.WebhookURL, resp.StatusCode)
 		m.scheduleFailureRetry(delivery, fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
 	}
 }
