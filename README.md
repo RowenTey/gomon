@@ -99,8 +99,8 @@ curl -X POST "http://127.0.0.1:8787/api/websites" \
     "url": "https://non-existent-website213131.com",
     "frequency": 300,
     "webhookEnabled": true,
-    "webhookUrl": "https://teybot.rowentey.xyz/webhook",
-    "webhookPayloadTemplate": "{\"chat_id\":-1002500967655,\"message_thread_id\":8,\"title\":\"Alert for {{websiteUrl}}\",\"message\":\"from={{previousStatus}}, to={{currentStatus}}, statusCode={{statusCode}}, responseTime={{responseTime}}, error={{error}}, timestamp={{timestamp}}\"}"
+    "webhookUrl": "https://example.com/webhook",
+    "webhookPayloadTemplate": "{\"chat_id\":-1002500967676,\"message_thread_id\":51,\"title\":\"Alert for {{websiteUrl}}\",\"message\":\"from={{previousStatus}}, to={{currentStatus}}, statusCode={{statusCode}}, responseTime={{responseTime}}, error={{error}}, timestamp={{timestamp}}\"}"
   }'
 ```
 
