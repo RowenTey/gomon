@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: 1.23
-          
+
       - name: Setup tinygo
         uses: acifani/setup-tinygo@v2
         with:
@@ -45,8 +45,3 @@ jobs:
           CLEANED_URL=$(echo "${{ steps.deploy.outputs.deployment-url }}" | sed 's/ (custom domain)//')
           echo "Clean URL: $CLEANED_URL"
           echo "cleaned-url=$CLEANED_URL" >> $GITHUB_OUTPUT
-
-      - name: Print Wrangler command output
-        env:
-          CMD_OUTPUT: ${{ steps.deploy.outputs.command-output }}
-        run: echo $CMD_OUTPUT
