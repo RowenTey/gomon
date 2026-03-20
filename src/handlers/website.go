@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -35,6 +36,7 @@ func NewWebsiteHandler(minFrequency int, appStorage storage.Storage) *WebsiteHan
 func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateWebsiteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logErrorf("CreateWebsite: invalid request body: %v", err)
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   "Invalid request body",
@@ -44,6 +46,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 
 	// Validate the request
 	if req.URL == "" {
+		logErrorf("CreateWebsite: missing url")
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   "URL is required",
@@ -56,6 +59,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := validateWebhookRequest(req.WebhookEnabled, req.WebhookURL); err != nil {
+		logErrorf("CreateWebsite: invalid webhook config for url=%s: %v", req.URL, err)
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -66,6 +70,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	// Check if website already exists
 	_, err := h.storage.GetWebsite(req.URL)
 	if err == nil {
+		logErrorf("CreateWebsite: duplicate website url=%s", req.URL)
 		SendJSONResponse(w, http.StatusConflict, models.APIResponse{
 			Success: false,
 			Error:   "Website already exists",
@@ -73,6 +78,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != sql.ErrNoRows {
+		logErrorf("CreateWebsite: failed checking existing website url=%s: %v", req.URL, err)
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to check existing website",
@@ -97,6 +103,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.storage.CreateWebsite(website); err != nil {
+		logErrorf("CreateWebsite: failed saving website url=%s: %v", req.URL, err)
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to save website",
@@ -115,6 +122,7 @@ func (h *WebsiteHandler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 func (h *WebsiteHandler) GetWebsite(w http.ResponseWriter, r *http.Request, url string) {
 	website, err := h.storage.GetWebsite(url)
 	if err != nil {
+		logErrorf("GetWebsite: website not found url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusNotFound, models.APIResponse{
 			Success: false,
 			Error:   "Website not found",
@@ -132,6 +140,7 @@ func (h *WebsiteHandler) GetWebsite(w http.ResponseWriter, r *http.Request, url 
 func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, url string) {
 	website, err := h.storage.GetWebsite(url)
 	if err != nil {
+		logErrorf("UpdateWebsite: website not found url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusNotFound, models.APIResponse{
 			Success: false,
 			Error:   "Website not found",
@@ -141,6 +150,7 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 
 	var req models.UpdateWebsiteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logErrorf("UpdateWebsite: invalid request body for url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   "Invalid request body",
@@ -166,6 +176,7 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 		website.WebhookPayloadTemplate = *req.WebhookPayloadTemplate
 	}
 	if err := validateWebhookRequest(website.WebhookEnabled, website.WebhookURL); err != nil {
+		logErrorf("UpdateWebsite: invalid webhook config for url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -174,6 +185,7 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 	}
 
 	if err := h.storage.UpdateWebsite(*website); err != nil {
+		logErrorf("UpdateWebsite: failed updating website url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to update website",
@@ -189,6 +201,7 @@ func (h *WebsiteHandler) UpdateWebsite(w http.ResponseWriter, r *http.Request, u
 }
 func (h *WebsiteHandler) DeleteWebsite(w http.ResponseWriter, r *http.Request, url string) {
 	if err := h.storage.DeleteWebsite(url); err != nil {
+		logErrorf("DeleteWebsite: failed deleting website url=%s: %v", url, err)
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to delete website",
@@ -206,6 +219,7 @@ func (h *WebsiteHandler) DeleteWebsite(w http.ResponseWriter, r *http.Request, u
 func (h *WebsiteHandler) ListWebsites(w http.ResponseWriter, r *http.Request) {
 	websites, err := h.storage.ListWebsites(1000)
 	if err != nil {
+		logErrorf("ListWebsites: failed listing websites: %v", err)
 		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "Failed to list websites",
@@ -223,6 +237,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 	// Extract URL from query parameters
 	url := r.URL.Query().Get("websiteUrl")
 	if url == "" {
+		logErrorf("GetShieldsIoBadge: missing websiteUrl query param")
 		SendJSONResponse(w, http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   "URL parameter is required",
@@ -238,6 +253,7 @@ func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Reques
 
 	website, err := h.storage.GetWebsite(url)
 	if err != nil {
+		logErrorf("GetShieldsIoBadge: website not found url=%s: %v", url, err)
 		badge.Message = "UNKNOWN"
 		badge.Color = "red"
 		SendJSONResponse(w, http.StatusNotFound, badge)
@@ -274,6 +290,10 @@ func validateWebhookRequest(enabled bool, webhookURL string) error {
 		return errors.New("webhookUrl must be a valid http/https URL")
 	}
 	return nil
+}
+
+func logErrorf(format string, args ...any) {
+	log.Printf("[ERROR] "+format, args...)
 }
 
 // Helper function to send JSON responses
