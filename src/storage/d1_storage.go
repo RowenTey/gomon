@@ -55,8 +55,9 @@ func (d *D1Storage) CreateWebsite(website models.Website) error {
 		context.Background(),
 		`INSERT INTO websites (
 			url, frequency, last_checked_at, created_at, updated_at, status, response_time, status_code, error,
-			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template,
+			last_unhealthy_notification_at, last_unhealthy_notification_type
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		website.URL,
 		website.Frequency,
 		website.LastCheckedAt,
@@ -70,6 +71,8 @@ func (d *D1Storage) CreateWebsite(website models.Website) error {
 		boolToInt(website.WebhookEnabled),
 		website.WebhookURL,
 		website.WebhookPayloadTemplate,
+		website.LastUnhealthyNotificationAt,
+		website.LastUnhealthyNotificationType,
 	)
 	return err
 }
@@ -81,7 +84,8 @@ func (d *D1Storage) GetWebsite(url string) (*models.Website, error) {
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template,
+			last_unhealthy_notification_at, last_unhealthy_notification_type
 		FROM websites
 		WHERE url = ?`,
 		url,
@@ -98,6 +102,8 @@ func (d *D1Storage) GetWebsite(url string) (*models.Website, error) {
 		(*intBool)(&website.WebhookEnabled),
 		&website.WebhookURL,
 		&website.WebhookPayloadTemplate,
+		&website.LastUnhealthyNotificationAt,
+		&website.LastUnhealthyNotificationType,
 	)
 	if err != nil {
 		return nil, err
@@ -112,7 +118,8 @@ func (d *D1Storage) UpdateWebsite(website models.Website) error {
 		context.Background(),
 		`UPDATE websites
 		SET frequency = ?, last_checked_at = ?, updated_at = ?, status = ?, response_time = ?, status_code = ?, error = ?,
-			custom_headers = ?, webhook_enabled = ?, webhook_url = ?, webhook_payload_template = ?
+			custom_headers = ?, webhook_enabled = ?, webhook_url = ?, webhook_payload_template = ?,
+			last_unhealthy_notification_at = ?, last_unhealthy_notification_type = ?
 		WHERE url = ?`,
 		website.Frequency,
 		website.LastCheckedAt,
@@ -125,6 +132,8 @@ func (d *D1Storage) UpdateWebsite(website models.Website) error {
 		boolToInt(website.WebhookEnabled),
 		website.WebhookURL,
 		website.WebhookPayloadTemplate,
+		website.LastUnhealthyNotificationAt,
+		website.LastUnhealthyNotificationType,
 		website.URL,
 	)
 	return err
@@ -140,7 +149,8 @@ func (d *D1Storage) ListWebsites(limit int) ([]models.Website, error) {
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template,
+			last_unhealthy_notification_at, last_unhealthy_notification_type
 		FROM websites
 		ORDER BY created_at DESC
 		LIMIT ?`,
@@ -168,6 +178,8 @@ func (d *D1Storage) ListWebsites(limit int) ([]models.Website, error) {
 			(*intBool)(&website.WebhookEnabled),
 			&website.WebhookURL,
 			&website.WebhookPayloadTemplate,
+			&website.LastUnhealthyNotificationAt,
+			&website.LastUnhealthyNotificationType,
 		); err != nil {
 			return nil, err
 		}
@@ -183,7 +195,8 @@ func (d *D1Storage) ListWebsitesDueForCheck(now int64, limit int) ([]models.Webs
 		context.Background(),
 		`SELECT
 			url, frequency, last_checked_at, created_at, status, response_time, status_code, error,
-			custom_headers, webhook_enabled, webhook_url, webhook_payload_template
+			custom_headers, webhook_enabled, webhook_url, webhook_payload_template,
+			last_unhealthy_notification_at, last_unhealthy_notification_type
 		FROM websites
 		WHERE last_checked_at = 0 OR (? - last_checked_at) >= frequency
 		ORDER BY last_checked_at ASC
@@ -213,6 +226,8 @@ func (d *D1Storage) ListWebsitesDueForCheck(now int64, limit int) ([]models.Webs
 			(*intBool)(&website.WebhookEnabled),
 			&website.WebhookURL,
 			&website.WebhookPayloadTemplate,
+			&website.LastUnhealthyNotificationAt,
+			&website.LastUnhealthyNotificationType,
 		); err != nil {
 			return nil, err
 		}

@@ -18,12 +18,13 @@
 	},
 	"vars": {
 		"D1_BINDING": "DB",
-		"MIN_FREQUENCY": "30", // in seconds
+		"MIN_FREQUENCY": "5", // in seconds
 		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
 		"WEBHOOK_MAX_ATTEMPTS": "3",
 		"WEBHOOK_INITIAL_DELAY_SEC": "30",
 		"WEBHOOK_MAX_DELAY_SEC": "300",
-		"WEBHOOK_BACKOFF_FACTOR": "2"
+		"WEBHOOK_BACKOFF_FACTOR": "2",
+		"WEBHOOK_REPEAT_UNHEALTHY_COOLDOWN_SEC": "10"
 	},
 	"routes": [
 		{

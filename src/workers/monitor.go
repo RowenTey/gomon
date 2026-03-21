@@ -151,12 +151,22 @@ func (m *Monitor) updateStatus(website *models.Website, previousStatus models.St
 		website.Status = models.StatusUnknown
 	}
 
+	if website.Status == models.StatusUp && previousStatus != models.StatusUp {
+		website.LastUnhealthyNotificationAt = 0
+		website.LastUnhealthyNotificationType = ""
+	}
+
 	if err := m.storage.UpdateWebsite(*website); err != nil {
 		log.Printf("Error updating status for %s: %v\n", website.URL, err)
 		return
 	}
 
-	if !m.shouldNotify(previousStatus, website.Status, website, config) {
+	shouldNotify, remainingCooldownSec := m.shouldNotify(previousStatus, website.Status, website, config, now)
+	if !shouldNotify {
+		if remainingCooldownSec > 0 {
+			log.Printf("Skipping webhook notification for %s due to cooldown (%ds remaining)\n", website.URL, remainingCooldownSec)
+			return
+		}
 		log.Printf("No notification needed for %s status change from %s to %s\n", website.URL, previousStatus, website.Status)
 		return
 	}
@@ -181,25 +191,46 @@ func (m *Monitor) updateStatus(website *models.Website, previousStatus models.St
 	delivery := models.NewWebhookDelivery(event.EventID, *website, config, payload, now)
 	if err := m.storage.EnqueueWebhookDelivery(delivery); err != nil {
 		log.Printf("Error enqueueing webhook delivery for %s: %v\n", website.URL, err)
+		return
+	}
+
+	if isUnhealthyStatus(website.Status) {
+		website.LastUnhealthyNotificationAt = now
+		website.LastUnhealthyNotificationType = website.Status
+		if err := m.storage.UpdateWebsite(*website); err != nil {
+			log.Printf("Error updating unhealthy notification cooldown state for %s: %v\n", website.URL, err)
+		}
 	}
 
 	log.Printf("Enqueued webhook delivery for %s status change from %s to %s with event ID %s\n", website.URL, previousStatus, website.Status, event.EventID)
 }
 
-func (m *Monitor) shouldNotify(previousStatus, currentStatus models.StatusType, website *models.Website, config models.WebhookRuntimeConfig) bool {
+func (m *Monitor) shouldNotify(previousStatus, currentStatus models.StatusType, website *models.Website, config models.WebhookRuntimeConfig, now int64) (bool, int64) {
 	if !website.WebhookEnabled || website.WebhookURL == "" {
-		return false
+		return false, 0
 	}
-	// if previousStatus == currentStatus {
-	// 	return false
-	// }
-	if currentStatus == models.StatusDegraded || currentStatus == models.StatusDown {
-		return true
+
+	if isUnhealthyStatus(currentStatus) {
+		cooldownSec := int64(config.RepeatUnhealthyCooldownSec)
+		if website.LastUnhealthyNotificationAt > 0 {
+			elapsed := now - website.LastUnhealthyNotificationAt
+			if elapsed < cooldownSec {
+				return false, cooldownSec - elapsed
+			}
+		}
+
+		return true, 0
 	}
+
 	if config.NotifyOnRecovery && previousStatus != models.StatusUp && currentStatus == models.StatusUp {
-		return true
+		return true, 0
 	}
-	return false
+
+	return false, 0
+}
+
+func isUnhealthyStatus(status models.StatusType) bool {
+	return status == models.StatusDegraded || status == models.StatusDown
 }
 
 func (m *Monitor) processWebhookDeliveries() {
@@ -336,7 +367,7 @@ func renderPayload(payloadTemplate string, event models.WebhookEvent) (string, e
 		"{{websiteUrl}}", escapeJSONStringValue(event.WebsiteURL),
 		"{{timestamp}}", time.Unix(event.Timestamp, 0).UTC().Format(time.RFC3339),
 		"{{previousStatus}}", escapeJSONStringValue(string(event.PreviousStatus)),
-		"{{currentStatus}}", escapeJSONStringValue(string(event.CurrentStatus)),
+		"{{currentStatus}}", escapeJSONStringValue(strings.ToUpper(string(event.CurrentStatus))),
 		"{{responseTime}}", strconv.Itoa(event.ResponseTime),
 		"{{statusCode}}", strconv.Itoa(event.StatusCode),
 		"{{error}}", escapeJSONStringValue(event.Error),

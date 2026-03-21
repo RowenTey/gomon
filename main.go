@@ -41,11 +41,12 @@ func main() {
 	websiteHandler := handlers.NewWebsiteHandler(minFrequency, d1Storage)
 
 	webhookConfig := models.WebhookRuntimeConfig{
-		NotifyOnRecovery: parseBoolWithDefault(cloudflare.Getenv("WEBHOOK_NOTIFY_ON_RECOVERY"), true),
-		MaxAttempts:      parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_ATTEMPTS"), 3),
-		InitialDelaySec:  parseIntWithDefault(cloudflare.Getenv("WEBHOOK_INITIAL_DELAY_SEC"), 30),
-		MaxDelaySec:      parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_DELAY_SEC"), 300),
-		BackoffFactor:    parseFloatWithDefault(cloudflare.Getenv("WEBHOOK_BACKOFF_FACTOR"), 2.0),
+		NotifyOnRecovery:           parseBoolWithDefault(cloudflare.Getenv("WEBHOOK_NOTIFY_ON_RECOVERY"), true),
+		MaxAttempts:                parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_ATTEMPTS"), 3),
+		InitialDelaySec:            parseIntWithDefault(cloudflare.Getenv("WEBHOOK_INITIAL_DELAY_SEC"), 30),
+		MaxDelaySec:                parseIntWithDefault(cloudflare.Getenv("WEBHOOK_MAX_DELAY_SEC"), 300),
+		BackoffFactor:              parseFloatWithDefault(cloudflare.Getenv("WEBHOOK_BACKOFF_FACTOR"), 2.0),
+		RepeatUnhealthyCooldownSec: parseIntWithDefault(cloudflare.Getenv("WEBHOOK_REPEAT_UNHEALTHY_COOLDOWN_SEC"), 600),
 	}
 	webhookConfig.ApplyDefaults()
 

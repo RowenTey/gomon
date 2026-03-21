@@ -8,15 +8,17 @@ import (
 
 // Website represents a monitored website configuration
 type Website struct {
-	URL           string            `json:"url"`
-	Frequency     int               `json:"frequency"` // in seconds
-	LastCheckedAt int64             `json:"lastCheckedAt,omitempty"`
-	CreatedAt     int64             `json:"createdAt"`
-	Status        StatusType        `json:"status"`
-	ResponseTime  int               `json:"responseTime,omitempty"` // in milliseconds
-	StatusCode    int               `json:"statusCode"`
-	Error         string            `json:"error,omitempty"`
-	CustomHeaders map[string]string `json:"customHeaders,omitempty"`
+	URL                           string            `json:"url"`
+	Frequency                     int               `json:"frequency"` // in seconds
+	LastCheckedAt                 int64             `json:"lastCheckedAt,omitempty"`
+	CreatedAt                     int64             `json:"createdAt"`
+	Status                        StatusType        `json:"status"`
+	ResponseTime                  int               `json:"responseTime,omitempty"` // in milliseconds
+	StatusCode                    int               `json:"statusCode"`
+	Error                         string            `json:"error,omitempty"`
+	CustomHeaders                 map[string]string `json:"customHeaders,omitempty"`
+	LastUnhealthyNotificationAt   int64             `json:"lastUnhealthyNotificationAt,omitempty"`
+	LastUnhealthyNotificationType StatusType        `json:"lastUnhealthyNotificationType,omitempty"`
 
 	WebhookEnabled         bool   `json:"webhookEnabled"`
 	WebhookURL             string `json:"webhookUrl,omitempty"`
@@ -55,11 +57,12 @@ type UpdateWebsiteRequest struct {
 // WebhookRuntimeConfig is global webhook behavior shared by all websites.
 // It is intended to be loaded from environment variables.
 type WebhookRuntimeConfig struct {
-	NotifyOnRecovery bool    `json:"notifyOnRecovery"`
-	MaxAttempts      int     `json:"maxAttempts"`
-	InitialDelaySec  int     `json:"initialDelaySec"`
-	MaxDelaySec      int     `json:"maxDelaySec"`
-	BackoffFactor    float64 `json:"backoffFactor"`
+	NotifyOnRecovery           bool    `json:"notifyOnRecovery"`
+	MaxAttempts                int     `json:"maxAttempts"`
+	InitialDelaySec            int     `json:"initialDelaySec"`
+	MaxDelaySec                int     `json:"maxDelaySec"`
+	BackoffFactor              float64 `json:"backoffFactor"`
+	RepeatUnhealthyCooldownSec int     `json:"repeatUnhealthyCooldownSec"`
 }
 
 // APIResponse represents a standard API response format
@@ -124,6 +127,9 @@ func (c *WebhookRuntimeConfig) ApplyDefaults() {
 	}
 	if c.MaxDelaySec < c.InitialDelaySec {
 		c.MaxDelaySec = c.InitialDelaySec
+	}
+	if c.RepeatUnhealthyCooldownSec <= 0 {
+		c.RepeatUnhealthyCooldownSec = 600
 	}
 }
 
