@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -118,12 +119,14 @@ func (m *Monitor) checkWebsite(website *models.Website, config models.WebhookRun
 	responseTime := int(time.Since(startTime).Milliseconds())
 
 	if err != nil {
+		log.Printf("Error checking website %s: %v\n", website.URL, err)
 		m.updateStatus(website, previousStatus, 0, responseTime, err.Error(), config)
 		return
 	}
 	defer resp.Body.Close()
 
 	// Update status based on response
+	log.Printf("Website %s check complete, status - %v", website.URL, resp.StatusCode)
 	m.updateStatus(website, previousStatus, resp.StatusCode, responseTime, "", config)
 }
 
@@ -154,6 +157,7 @@ func (m *Monitor) updateStatus(website *models.Website, previousStatus models.St
 	}
 
 	if !m.shouldNotify(previousStatus, website.Status, website, config) {
+		log.Printf("No notification needed for %s status change from %s to %s\n", website.URL, previousStatus, website.Status)
 		return
 	}
 
@@ -172,19 +176,23 @@ func (m *Monitor) updateStatus(website *models.Website, previousStatus models.St
 		log.Printf("Error rendering webhook payload for %s: %v\n", website.URL, err)
 		return
 	}
+	log.Printf("Rendered webhook payload for %s: %s\n", website.URL, payload)
+
 	delivery := models.NewWebhookDelivery(event.EventID, *website, config, payload, now)
 	if err := m.storage.EnqueueWebhookDelivery(delivery); err != nil {
 		log.Printf("Error enqueueing webhook delivery for %s: %v\n", website.URL, err)
 	}
+
+	log.Printf("Enqueued webhook delivery for %s status change from %s to %s with event ID %s\n", website.URL, previousStatus, website.Status, event.EventID)
 }
 
 func (m *Monitor) shouldNotify(previousStatus, currentStatus models.StatusType, website *models.Website, config models.WebhookRuntimeConfig) bool {
 	if !website.WebhookEnabled || website.WebhookURL == "" {
 		return false
 	}
-	if previousStatus == currentStatus {
-		return false
-	}
+	// if previousStatus == currentStatus {
+	// 	return false
+	// }
 	if currentStatus == models.StatusDegraded || currentStatus == models.StatusDown {
 		return true
 	}
@@ -203,6 +211,7 @@ func (m *Monitor) processWebhookDeliveries() {
 	}
 
 	if len(deliveries) == 0 {
+		log.Printf("No deliveries to be processed...")
 		return
 	}
 
@@ -231,7 +240,14 @@ func (m *Monitor) processWebhookDeliveries() {
 			m.scheduleFailureRetry(delivery, err.Error())
 			continue
 		}
-		_ = resp.Body.Close()
+
+		responseBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			log.Printf("Error reading webhook response body for %s: %v\n", delivery.WebhookURL, readErr)
+		}
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("Error closing webhook response body for %s: %v\n", delivery.WebhookURL, closeErr)
+		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			if err := m.storage.MarkWebhookDeliverySuccess(delivery.EventID, time.Now().Unix()); err != nil {
@@ -240,7 +256,7 @@ func (m *Monitor) processWebhookDeliveries() {
 			continue
 		}
 
-		log.Printf("Received non-2xx response for webhook %s: %d\n", delivery.WebhookURL, resp.StatusCode)
+		log.Printf("Received non-2xx response for webhook %s: %d, body: %s\n", delivery.WebhookURL, resp.StatusCode, string(responseBody))
 		m.scheduleFailureRetry(delivery, fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
 	}
 }
@@ -316,15 +332,31 @@ func renderPayload(payloadTemplate string, event models.WebhookEvent) (string, e
 	}
 
 	replacer := strings.NewReplacer(
-		"{{eventId}}", event.EventID,
-		"{{websiteUrl}}", event.WebsiteURL,
-		"{{timestamp}}", strconv.FormatInt(event.Timestamp, 10),
-		"{{previousStatus}}", string(event.PreviousStatus),
-		"{{currentStatus}}", string(event.CurrentStatus),
+		"{{eventId}}", escapeJSONStringValue(event.EventID),
+		"{{websiteUrl}}", escapeJSONStringValue(event.WebsiteURL),
+		"{{timestamp}}", time.Unix(event.Timestamp, 0).UTC().Format(time.RFC3339),
+		"{{previousStatus}}", escapeJSONStringValue(string(event.PreviousStatus)),
+		"{{currentStatus}}", escapeJSONStringValue(string(event.CurrentStatus)),
 		"{{responseTime}}", strconv.Itoa(event.ResponseTime),
 		"{{statusCode}}", strconv.Itoa(event.StatusCode),
-		"{{error}}", event.Error,
+		"{{error}}", escapeJSONStringValue(event.Error),
 	)
 
-	return replacer.Replace(payloadTemplate), nil
+	rendered := replacer.Replace(payloadTemplate)
+	if !json.Valid([]byte(rendered)) {
+		return "", fmt.Errorf("rendered webhook payload is not valid JSON")
+	}
+
+	return rendered, nil
+}
+
+func escapeJSONStringValue(value string) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return value
+	}
+	if len(encoded) < 2 {
+		return value
+	}
+	return string(encoded[1 : len(encoded)-1])
 }
