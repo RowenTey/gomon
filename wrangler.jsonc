@@ -14,11 +14,11 @@
 		"enabled": true
 	},
 	"triggers": {
-		"crons": ["*/5 * * * *"]
+		"crons": ["* * * * *"]
 	},
 	"vars": {
 		"D1_BINDING": "DB",
-		"MIN_FREQUENCY": "300", // in seconds
+		"MIN_FREQUENCY": "30", // in seconds
 		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
 		"WEBHOOK_MAX_ATTEMPTS": "3",
 		"WEBHOOK_INITIAL_DELAY_SEC": "30",
