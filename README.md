@@ -15,7 +15,7 @@ GoMon ships with a built-in web dashboard served at the root path (`/`). No sepa
 ## 🛠 Getting Started
 
 > [!IMPORTANT]  
-> Make sure you have [`tinygo`](https://tinygo.org/getting-started/install/) installed as this project requires it to compile to **WASM** for Cloudflare Workers
+> Make sure you have **Go 1.26+** installed as this project requires it to compile to **WASM** for Cloudflare Workers
 
 1\. Install dependencies
 
@@ -109,23 +109,6 @@ Set webhook fields in the create or update request body:
 }
 ```
 
-Sample request:
-
-```bash
-curl -X POST "http://127.0.0.1:8787/api/websites" \
-  -H "Content-Type: application/json" \
-  --data-raw '{
-    "url": "https://non-existent-website213131.com",
-    "frequency": 300,
-    "customHeaders": {
-      "Authorization": "Bearer your-token",
-      "X-Monitor-Source": "gomon"
-    },
-    "webhookEnabled": true,
-    "webhookUrl": "https://example.com/webhook",
-    "webhookPayloadTemplate": "{\"chat_id\":-1002500967676,\"message_thread_id\":51,\"title\":\"Alert for {{websiteUrl}}\",\"message\":\"from={{previousStatus}}, to={{currentStatus}}, statusCode={{statusCode}}, responseTime={{responseTime}}, error={{error}}, timestamp={{timestamp}}\"}"
-  }'
-```
 
 Webhook retry/recovery behavior is global and configured through env vars in `wrangler.jsonc`.
 

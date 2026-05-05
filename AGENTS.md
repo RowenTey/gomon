@@ -1,10 +1,10 @@
 # GoMon
 
-Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled to WASM via TinyGo, backed by D1.
+Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled to WASM via the standard Go compiler, backed by D1.
 
 ## Build system
 
-- **Not a standard Go project.** All `.go` files carry `//go:build js && wasm` — they only compile under TinyGo targeting WASM. Standard `go build` will produce empty binaries.
+- **Not a standard Go project.** All `.go` files carry `//go:build js && wasm` — they only compile under a WASM target (`GOOS=js GOARCH=wasm`). Standard `go build` will produce empty binaries.
 - Entrypoint: `main.go`. Router + cron wiring lives there.
 - Five internal packages under `src/`: `handlers` (includes both API handlers and `ui.go` with the web dashboard), `models`, `storage`, `monitoring` (aliased as `workers` in go.mod imports).
 - Storage is D1 via `sql.Open("d1", bindingName)` using `syumai/workers/cloudflare/d1`.
@@ -23,7 +23,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 | Command | What it does |
 |---|---|
-| `npm run build` | `workers-assets-gen` then `tinygo build -o ./build/app.wasm -target wasm -no-debug ./...` |
+| `npm run build` | `workers-assets-gen -mode=go` then `GOOS=js GOARCH=wasm go build -o ./build/app.wasm .` |
 | `npm start` / `npm run dev` | `wrangler dev --test-scheduled` |
 | `npm run deploy` | `wrangler deploy` |
 | Trigger cron locally | `curl "http://127.0.0.1:8787/__scheduled"` |
