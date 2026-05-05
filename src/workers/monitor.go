@@ -27,15 +27,20 @@ type Monitor struct {
 	httpClient    *http.Client
 	isRunning     bool
 	mu            sync.Mutex
+	timeoutSec    int
 }
 
 // NewMonitor creates a new monitor instance
-func NewMonitor(appStorage storage.Storage, config models.WebhookRuntimeConfig) *Monitor {
+func NewMonitor(appStorage storage.Storage, config models.WebhookRuntimeConfig, timeoutSec int) *Monitor {
 	config.ApplyDefaults()
+	if timeoutSec <= 0 {
+		timeoutSec = 3
+	}
 	return &Monitor{
 		storage:       appStorage,
 		runtimeConfig: config,
 		isRunning:     false,
+		timeoutSec:    timeoutSec,
 	}
 }
 
@@ -103,7 +108,9 @@ func (m *Monitor) checkWebsite(website *models.Website, config models.WebhookRun
 	cli := fetch.NewClient()
 
 	// Make HTTP request to check status
-	req, err := fetch.NewRequest(context.Background(), http.MethodGet, website.URL, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(m.timeoutSec)*time.Second)
+	defer cancel()
+	req, err := fetch.NewRequest(ctx, http.MethodGet, website.URL, nil)
 	if err != nil {
 		m.updateStatus(website, previousStatus, 0, -1, err.Error(), config)
 		return

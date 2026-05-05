@@ -31,11 +31,8 @@ func main() {
 		panic(err)
 	}
 
-	minFrequencyStr := cloudflare.Getenv("MIN_FREQUENCY")
-	minFrequency, err := strconv.Atoi(minFrequencyStr)
-	if err != nil {
-		panic(err)
-	}
+	minFrequency := parseIntWithDefault(cloudflare.Getenv("MIN_FREQUENCY"), 300)
+	monitorTimeout := parseIntWithDefault(cloudflare.Getenv("MONITOR_TIMEOUT_SEC"), 3)
 
 	// Initialize website handler
 	websiteHandler := handlers.NewWebsiteHandler(minFrequency, d1Storage)
@@ -110,6 +107,17 @@ func main() {
 				})
 			}
 
+		// Webhook deliveries endpoint
+		case path == "/api/webhook-deliveries":
+			if r.Method == http.MethodGet {
+				websiteHandler.ListWebhookDeliveries(w, r)
+			} else {
+				handlers.SendJSONResponse(w, http.StatusMethodNotAllowed, models.APIResponse{
+					Success: false,
+					Error:   "Method not allowed",
+				})
+			}
+
 		// Health check endpoint
 		case path == "/health":
 			handlers.SendJSONResponse(w, http.StatusOK, models.APIResponse{
@@ -118,13 +126,16 @@ func main() {
 				Data:    map[string]string{"status": "ok"},
 			})
 
-		// Root endpoint
+		// Root endpoint — serves the web UI dashboard
 		case path == "/":
-			handlers.SendJSONResponse(w, http.StatusOK, models.APIResponse{
-				Success: true,
-				Error:   "",
-				Data:    map[string]string{"message": "Hello from gomon :)"},
-			})
+			if r.Method == http.MethodGet {
+				handlers.ServeUI(w, r)
+			} else {
+				handlers.SendJSONResponse(w, http.StatusMethodNotAllowed, models.APIResponse{
+					Success: false,
+					Error:   "Method not allowed",
+				})
+			}
 
 		// Handle 404
 		default:
@@ -148,7 +159,7 @@ func main() {
 		log.Println("CRON ran at:", e.ScheduledTime.Format("02-01-2006 15:04:05"))
 
 		// Initialize monitor and start monitoring routine
-		monitor := monitoring.NewMonitor(d1Storage, webhookConfig)
+		monitor := monitoring.NewMonitor(d1Storage, webhookConfig, monitorTimeout)
 		monitor.StartMonitoring()
 		return nil
 	}

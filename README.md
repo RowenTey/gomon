@@ -2,6 +2,16 @@
 
 > Stay effortlessly updated on your website's status—never miss a beat!
 
+## 🖥 Web Dashboard
+
+GoMon ships with a built-in web dashboard served at the root path (`/`). No separate frontend build is needed — it is embedded directly in the Go binary as a self-contained HTML/CSS/JS page.
+
+**Features:**
+
+- **Website management** — View all monitored sites with live status indicators (green = up, red = down, orange = degraded), response times, status codes, and last-checked timestamps. Add, edit, and delete websites through modal forms.
+- **Webhook delivery queue** — Inspect webhook notification history: pending retries, delivered events, and failed attempts with error messages.
+- **Auto-refresh** — Both tabs poll the API every 15 seconds.
+
 ## 🛠 Getting Started
 
 > [!IMPORTANT]  
@@ -36,7 +46,8 @@ npx wrangler d1 create gomon
 ```
 "vars": {
   "D1_BINDING": "DB",
-  "MIN_FREQUENCY": "", // in seconds
+  "MIN_FREQUENCY": "",      // in seconds (default 300)
+  "MONITOR_TIMEOUT_SEC": "", // HTTP timeout per check (default 3)
   "WEBHOOK_NOTIFY_ON_RECOVERY": "true",
   "WEBHOOK_MAX_ATTEMPTS": "3",
   "WEBHOOK_INITIAL_DELAY_SEC": "30",
@@ -70,7 +81,11 @@ curl "http://127.0.0.1:8787/__scheduled"
 ```terminal
 .
 ├── src/                  # go packages
-├── main.go               # entrypoint
+│   ├── handlers/         # HTTP handlers (api + web ui)
+│   ├── models/           # data types & api contracts
+│   ├── storage/          # D1 persistence layer
+│   └── workers/          # monitoring & webhook logic
+├── main.go               # entrypoint + router
 ├── wrangler.jsonc        # cloudflare worker configuration
 ```
 

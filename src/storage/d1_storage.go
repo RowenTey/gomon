@@ -26,6 +26,7 @@ type Storage interface {
 	ListDueWebhookDeliveries(now int64, limit int) ([]models.WebhookDelivery, error)
 	MarkWebhookDeliverySuccess(eventID string, deliveredAt int64) error
 	MarkWebhookDeliveryFailure(eventID string, nextAttemptAt int64, attemptCount int, exhausted bool, lastErr string) error
+	ListWebhookDeliveries(limit int) ([]models.WebhookDelivery, error)
 }
 
 // D1Storage implements Storage using Cloudflare D1.
@@ -275,6 +276,49 @@ func (d *D1Storage) ListDueWebhookDeliveries(now int64, limit int) ([]models.Web
 		ORDER BY next_attempt_at ASC
 		LIMIT ?`,
 		now,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	deliveries := make([]models.WebhookDelivery, 0)
+	for rows.Next() {
+		delivery := models.WebhookDelivery{}
+		if err := rows.Scan(
+			&delivery.EventID,
+			&delivery.WebsiteURL,
+			&delivery.WebhookURL,
+			&delivery.Payload,
+			&delivery.AttemptCount,
+			&delivery.MaxAttempts,
+			&delivery.InitialDelaySec,
+			&delivery.MaxDelaySec,
+			&delivery.BackoffFactor,
+			&delivery.NextAttemptAt,
+			&delivery.DeliveredAt,
+			&delivery.LastError,
+			&delivery.CreatedAt,
+			&delivery.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		deliveries = append(deliveries, delivery)
+	}
+
+	return deliveries, rows.Err()
+}
+
+func (d *D1Storage) ListWebhookDeliveries(limit int) ([]models.WebhookDelivery, error) {
+	rows, err := d.db.QueryContext(
+		context.Background(),
+		`SELECT event_id, website_url, webhook_url, payload, attempt_count, max_attempts,
+			initial_delay_sec, max_delay_sec, backoff_factor, next_attempt_at,
+			delivered_at, last_error, created_at, updated_at
+		FROM webhook_deliveries
+		ORDER BY created_at DESC
+		LIMIT ?`,
 		limit,
 	)
 	if err != nil {

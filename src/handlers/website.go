@@ -254,6 +254,23 @@ func (h *WebsiteHandler) ListWebsites(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *WebsiteHandler) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
+	deliveries, err := h.storage.ListWebhookDeliveries(1000)
+	if err != nil {
+		logErrorf("ListWebhookDeliveries: failed listing deliveries: %v", err)
+		SendJSONResponse(w, http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to list webhook deliveries",
+		})
+		return
+	}
+
+	SendJSONResponse(w, http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    deliveries,
+	})
+}
+
 func (h *WebsiteHandler) GetShieldsIoBadge(w http.ResponseWriter, r *http.Request) {
 	// Extract URL from query parameters
 	url := r.URL.Query().Get("websiteUrl")
