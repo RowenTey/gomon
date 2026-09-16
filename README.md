@@ -46,7 +46,7 @@ npx wrangler d1 create gomon
 ```
 "vars": {
   "D1_BINDING": "DB",
-  "MIN_FREQUENCY": "",      // in seconds (default 300)
+  "MIN_FREQUENCY": "",      // in seconds (default 240, keep below the cron interval)
   "MONITOR_TIMEOUT_SEC": "", // HTTP timeout per check (default 3)
   "WEBHOOK_NOTIFY_ON_RECOVERY": "true",
   "WEBHOOK_MAX_ATTEMPTS": "3",

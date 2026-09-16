@@ -31,7 +31,7 @@ func main() {
 		panic(err)
 	}
 
-	minFrequency := parseIntWithDefault(cloudflare.Getenv("MIN_FREQUENCY"), 300)
+	minFrequency := parseIntWithDefault(cloudflare.Getenv("MIN_FREQUENCY"), 240)
 	monitorTimeout := parseIntWithDefault(cloudflare.Getenv("MONITOR_TIMEOUT_SEC"), 3)
 
 	// Initialize website handler

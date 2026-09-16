@@ -31,7 +31,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 ## Architecture notes
 
-- Cron runs every minute (`"crons": ["* * * * *"]`). Each tick checks all websites due (query: `last_checked_at = 0 OR (now - last_checked_at) >= frequency`). Checks run in parallel goroutines within a single cron invocation.
+- Cron runs every 5 minutes (`"crons": ["*/5 * * * *"]`). Each tick checks all websites due (query: `last_checked_at = 0 OR (now - last_checked_at) >= frequency`). Checks run in parallel goroutines within a single cron invocation. `MIN_FREQUENCY` must stay below the cron interval (300s), otherwise ticks land a second or two short of `frequency` and skip every check.
 - Webhook delivery uses a retry queue with exponential backoff stored in D1. Per-website and global config in `wrangler.jsonc` `vars`.
 - **No tests exist** in the repo.
 - No lint/typecheck/formatter commands configured.

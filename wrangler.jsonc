@@ -20,7 +20,7 @@
 	},
 	"vars": {
 		"D1_BINDING": "DB",
-		"MIN_FREQUENCY": "300", // in seconds; must be >= the cron interval
+		"MIN_FREQUENCY": "240", // in seconds; keep below the cron interval so every tick is due
 		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
 		"WEBHOOK_MAX_ATTEMPTS": "3",
 		"WEBHOOK_INITIAL_DELAY_SEC": "30",
