@@ -14,11 +14,13 @@
 		"enabled": true
 	},
 	"triggers": {
-		"crons": ["* * * * *"]
+		// Run every 5 minutes. A per-minute cron fires 1,440 invocations/day and
+		// was the main driver of CPU usage (and exceededResources failures).
+		"crons": ["*/5 * * * *"]
 	},
 	"vars": {
 		"D1_BINDING": "DB",
-		"MIN_FREQUENCY": "5", // in seconds
+		"MIN_FREQUENCY": "300", // in seconds; must be >= the cron interval
 		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
 		"WEBHOOK_MAX_ATTEMPTS": "3",
 		"WEBHOOK_INITIAL_DELAY_SEC": "30",
