@@ -15,7 +15,7 @@ GoMon ships with a built-in web dashboard served at the root path (`/`). It is a
 ## 🛠 Getting Started
 
 > [!IMPORTANT]  
-> You need **TinyGo 0.41.x** and **Go 1.26.x** installed. TinyGo 0.41 compiles the project to **WASM** for Cloudflare Workers and supports Go 1.19–1.26. Pin TinyGo to 0.41.x — 0.42 changes the `wasm_exec.js` ABI and is not yet compatible with the `syumai/workers` v0.33.0 runtime glue used here.
+> You need **TinyGo 0.42.x** and **Go 1.27.x** installed. TinyGo 0.42 compiles the project to **WASM** for Cloudflare Workers. Its `wasm_exec.js` requires the `runtime.getRandomData` import, which `syumai/workers` provides from v0.34.0 onward — keep that dependency at v0.34.0 or newer.
 
 1\. Install dependencies
 
