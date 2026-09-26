@@ -1,16 +1,4 @@
-//go:build js && wasm
-
-package handlers
-
-import "net/http"
-
-func ServeUI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(dashboardHTML))
-}
-
-const dashboardHTML = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -455,4 +443,4 @@ if (document.getElementById('tab-deliveries').classList.contains('active')) load
 });
 </script>
 </body>
-</html>`
+</html>

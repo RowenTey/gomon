@@ -126,17 +126,6 @@ func main() {
 				Data:    map[string]string{"status": "ok"},
 			})
 
-		// Root endpoint — serves the web UI dashboard
-		case path == "/":
-			if r.Method == http.MethodGet {
-				handlers.ServeUI(w, r)
-			} else {
-				handlers.SendJSONResponse(w, http.StatusMethodNotAllowed, models.APIResponse{
-					Success: false,
-					Error:   "Method not allowed",
-				})
-			}
-
 		// Handle 404
 		default:
 			// 404

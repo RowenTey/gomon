@@ -1,19 +1,21 @@
 # GoMon
 
-Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled to WASM via the standard Go compiler, backed by D1.
+Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled to WASM via TinyGo, backed by D1.
 
 ## Build system
 
-- **Not a standard Go project.** All `.go` files carry `//go:build js && wasm` — they only compile under a WASM target (`GOOS=js GOARCH=wasm`). Standard `go build` will produce empty binaries.
+- **Not a standard Go project.** All `.go` files carry `//go:build js && wasm` — they only compile under TinyGo targeting WASM. Standard `go build` will produce empty binaries. TinyGo 0.41.x supports Go 1.19–1.26, so pin Go 1.26.x. Do **not** use TinyGo 0.42 — it changes the `wasm_exec.js` ABI (requires `gojs.runtime.getRandomData`) and fails to link against the `syumai/workers` v0.33.0 runtime glue.
 - Entrypoint: `main.go`. Router + cron wiring lives there.
-- Five internal packages under `src/`: `handlers` (includes both API handlers and `ui.go` with the web dashboard), `models`, `storage`, `monitoring` (aliased as `workers` in go.mod imports).
+- Four internal packages under `src/`: `handlers` (API handlers), `models`, `storage`, `monitoring` (aliased as `workers` in go.mod imports).
+- The web dashboard is a static asset at `public/index.html`, served by Workers Static Assets — not embedded in the Wasm binary.
 - Storage is D1 via `sql.Open("d1", bindingName)` using `syumai/workers/cloudflare/d1`.
 
 ## API routes
 
+`GET /` is served by Workers Static Assets from `public/index.html` and never invokes the worker.
+
 | Method | Path | Handler | Description |
 |---|---|---|---|
-| GET | `/` | `ServeUI` | Web dashboard |
 | GET/POST/PUT/DELETE | `/api/websites` | `WebsiteHandler` | Website CRUD |
 | GET | `/api/websites/badge` | `GetShieldsIoBadge` | Shields.io badge JSON |
 | GET | `/api/webhook-deliveries` | `ListWebhookDeliveries` | Webhook delivery queue |
@@ -23,7 +25,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 | Command | What it does |
 |---|---|
-| `npm run build` | `workers-assets-gen -mode=go` then `GOOS=js GOARCH=wasm go build -o ./build/app.wasm .` |
+| `npm run build` | `workers-assets-gen -mode=tinygo` then `tinygo build -o ./build/app.wasm -target wasm -no-debug .` |
 | `npm start` / `npm run dev` | `wrangler dev --test-scheduled` |
 | `npm run deploy` | `wrangler deploy` |
 | Trigger cron locally | `curl "http://127.0.0.1:8787/__scheduled"` |
@@ -33,6 +35,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 - Cron runs every 5 minutes (`"crons": ["*/5 * * * *"]`). Each tick checks all websites due (query: `last_checked_at = 0 OR (now - last_checked_at) >= frequency`). Checks run in parallel goroutines within a single cron invocation. `MIN_FREQUENCY` must stay below the cron interval (300s), otherwise ticks land a second or two short of `frequency` and skip every check.
 - Webhook delivery uses a retry queue with exponential backoff stored in D1. Per-website and global config in `wrangler.jsonc` `vars`.
+- Requests matching a file in `public/` are served by Workers Static Assets before the worker runs (`assets.run_worker_first` is false). All other paths (API, `/health`, 404s) fall through to the Go worker.
 - **No tests exist** in the repo.
 - No lint/typecheck/formatter commands configured.
 

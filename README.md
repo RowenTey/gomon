@@ -4,7 +4,7 @@
 
 ## 🖥 Web Dashboard
 
-GoMon ships with a built-in web dashboard served at the root path (`/`). No separate frontend build is needed — it is embedded directly in the Go binary as a self-contained HTML/CSS/JS page.
+GoMon ships with a built-in web dashboard served at the root path (`/`). It is a self-contained HTML/CSS/JS page served as a Workers Static Asset from `public/index.html`, so it stays out of the Wasm bundle.
 
 **Features:**
 
@@ -15,7 +15,7 @@ GoMon ships with a built-in web dashboard served at the root path (`/`). No sepa
 ## 🛠 Getting Started
 
 > [!IMPORTANT]  
-> Make sure you have **Go 1.26+** installed as this project requires it to compile to **WASM** for Cloudflare Workers
+> You need **TinyGo 0.41.x** and **Go 1.26.x** installed. TinyGo 0.41 compiles the project to **WASM** for Cloudflare Workers and supports Go 1.19–1.26. Pin TinyGo to 0.41.x — 0.42 changes the `wasm_exec.js` ABI and is not yet compatible with the `syumai/workers` v0.33.0 runtime glue used here.
 
 1\. Install dependencies
 
@@ -80,8 +80,9 @@ curl "http://127.0.0.1:8787/__scheduled"
 
 ```terminal
 .
+├── public/               # static dashboard assets (Workers Static Assets)
 ├── src/                  # go packages
-│   ├── handlers/         # HTTP handlers (api + web ui)
+│   ├── handlers/         # HTTP API handlers
 │   ├── models/           # data types & api contracts
 │   ├── storage/          # D1 persistence layer
 │   └── workers/          # monitoring & webhook logic
