@@ -27,6 +27,7 @@
 	"vars": {
 		"D1_BINDING": "DB",
 		"MIN_FREQUENCY": "240", // in seconds; keep below the cron interval so every tick is due
+		"MONITOR_TIMEOUT_SEC": "2", // per-check HTTP deadline; enforced via AbortSignal.timeout
 		"WEBHOOK_NOTIFY_ON_RECOVERY": "true",
 		"WEBHOOK_MAX_ATTEMPTS": "3",
 		"WEBHOOK_INITIAL_DELAY_SEC": "30",

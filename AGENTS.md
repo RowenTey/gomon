@@ -6,7 +6,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 - **Not a standard Go project.** All `.go` files carry `//go:build js && wasm` — they only compile under TinyGo targeting WASM. Standard `go build` will produce empty binaries. Uses TinyGo 0.42.x with Go 1.27.x. TinyGo 0.42's `wasm_exec.js` requires the `runtime.getRandomData` import, provided by `syumai/workers` v0.34.0+; keep that dependency at v0.34.0 or newer. (The `syumai/workers` module is deprecated in favor of `syumai/workers-go`, but v0.34.0 still ships `workers-assets-gen` used by the build.)
 - Entrypoint: `main.go`. Router + cron wiring lives there.
-- Four internal packages under `src/`: `handlers` (API handlers), `models`, `storage`, `monitoring` (aliased as `workers` in go.mod imports).
+- Five internal packages under `src/`: `handlers` (API handlers), `models`, `storage`, `monitoring` (aliased as `workers` in go.mod imports), `httpclient` (outbound fetch with a real `AbortSignal.timeout`).
 - The web dashboard is a static asset at `public/index.html`, served by Workers Static Assets — not embedded in the Wasm binary.
 - Storage is D1 via `sql.Open("d1", bindingName)` using `syumai/workers/cloudflare/d1`.
 

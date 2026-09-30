@@ -3,10 +3,8 @@
 package monitoring
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,16 +13,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RowenTey/gomon/src/httpclient"
 	"github.com/RowenTey/gomon/src/models"
 	"github.com/RowenTey/gomon/src/storage"
-	"github.com/syumai/workers/cloudflare/fetch"
 )
+
+// userAgent identifies gomon's checks to monitored origins.
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/111.0"
+
+// webhookTimeout bounds a single webhook delivery attempt.
+const webhookTimeout = 15 * time.Second
 
 // Monitor manages website monitoring operations
 type Monitor struct {
 	storage       storage.Storage
 	runtimeConfig models.WebhookRuntimeConfig
-	httpClient    *http.Client
 	isRunning     bool
 	mu            sync.Mutex
 	timeoutSec    int
@@ -104,25 +107,19 @@ func (m *Monitor) checkWebsite(website *models.Website, config models.WebhookRun
 	startTime := time.Now()
 	previousStatus := website.Status
 
-	// Create fetch client
-	cli := fetch.NewClient()
-
-	// Make HTTP request to check status
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(m.timeoutSec)*time.Second)
-	defer cancel()
-	req, err := fetch.NewRequest(ctx, http.MethodGet, website.URL, nil)
-	if err != nil {
-		m.updateStatus(website, previousStatus, 0, -1, err.Error(), config)
-		return
-	}
-
 	// Set User-Agent to identify
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/111.0")
+	headers := map[string]string{"User-Agent": userAgent}
 	for key, value := range website.CustomHeaders {
-		req.Header.Set(key, value)
+		headers[key] = value
 	}
 
-	resp, err := cli.Do(req, nil)
+	// The body is never read, so it is cancelled rather than buffered.
+	resp, err := httpclient.Do(httpclient.Request{
+		Method:  http.MethodGet,
+		URL:     website.URL,
+		Headers: headers,
+		Timeout: time.Duration(m.timeoutSec) * time.Second,
+	}, false)
 	responseTime := int(time.Since(startTime).Milliseconds())
 
 	if err != nil {
@@ -130,7 +127,6 @@ func (m *Monitor) checkWebsite(website *models.Website, config models.WebhookRun
 		m.updateStatus(website, previousStatus, 0, responseTime, err.Error(), config)
 		return
 	}
-	defer resp.Body.Close()
 
 	// Update status based on response
 	log.Printf("Website %s check complete, status - %v", website.URL, resp.StatusCode)
@@ -260,7 +256,6 @@ func (m *Monitor) processWebhookDeliveries() {
 		return
 	}
 
-	cli := fetch.NewClient()
 	for _, delivery := range deliveries {
 		if err := validateDeliveryTarget(delivery.WebhookURL); err != nil {
 			log.Printf("Skipping invalid webhook URL %s: %v\n", delivery.WebhookURL, err)
@@ -268,30 +263,17 @@ func (m *Monitor) processWebhookDeliveries() {
 			continue
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		req, err := fetch.NewRequest(ctx, http.MethodPost, delivery.WebhookURL, strings.NewReader(delivery.Payload))
-		if err != nil {
-			log.Printf("Error creating webhook request for %s: %v\n", delivery.WebhookURL, err)
-			cancel()
-			m.scheduleFailureRetry(delivery, err.Error())
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := cli.Do(req, nil)
-		cancel()
+		resp, err := httpclient.Do(httpclient.Request{
+			Method:  http.MethodPost,
+			URL:     delivery.WebhookURL,
+			Headers: map[string]string{"Content-Type": "application/json"},
+			Body:    delivery.Payload,
+			Timeout: webhookTimeout,
+		}, true)
 		if err != nil {
 			log.Printf("Error sending webhook request for %s: %v\n", delivery.WebhookURL, err)
 			m.scheduleFailureRetry(delivery, err.Error())
 			continue
-		}
-
-		responseBody, readErr := io.ReadAll(resp.Body)
-		if readErr != nil {
-			log.Printf("Error reading webhook response body for %s: %v\n", delivery.WebhookURL, readErr)
-		}
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.Printf("Error closing webhook response body for %s: %v\n", delivery.WebhookURL, closeErr)
 		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -301,7 +283,7 @@ func (m *Monitor) processWebhookDeliveries() {
 			continue
 		}
 
-		log.Printf("Received non-2xx response for webhook %s: %d, body: %s\n", delivery.WebhookURL, resp.StatusCode, string(responseBody))
+		log.Printf("Received non-2xx response for webhook %s: %d, body: %s\n", delivery.WebhookURL, resp.StatusCode, resp.Body)
 		m.scheduleFailureRetry(delivery, fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
 	}
 }
