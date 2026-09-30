@@ -19,9 +19,10 @@
 		"enabled": true
 	},
 	"triggers": {
-		// Run every 5 minutes. A per-minute cron fires 1,440 invocations/day and
-		// was the main driver of CPU usage (and exceededResources failures).
-		"crons": ["*/5 * * * *"]
+		// Run every 15 minutes. On the Workers Free plan the cron CPU limit is
+		// 10ms, and the Go worker needs ~50ms, so most ticks are killed
+		// (exceededCpu). A longer cadence means fewer killed invocations/day.
+		"crons": ["*/15 * * * *"]
 	},
 	"vars": {
 		"D1_BINDING": "DB",
