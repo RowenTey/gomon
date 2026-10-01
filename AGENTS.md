@@ -33,7 +33,7 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 
 ## Architecture notes
 
-- Cron runs every 5 minutes (`"crons": ["*/5 * * * *"]`). Each tick checks all websites due (query: `last_checked_at = 0 OR (now - last_checked_at) >= frequency`). Checks run in parallel goroutines within a single cron invocation. `MIN_FREQUENCY` must stay below the cron interval (300s), otherwise ticks land a second or two short of `frequency` and skip every check.
+- Cron runs every 15 minutes (`"crons": ["*/15 * * * *"]`). Each tick checks all websites due (query: `last_checked_at = 0 OR (now - last_checked_at) >= frequency`). Checks run in parallel goroutines within a single cron invocation. `MIN_FREQUENCY` (240s) must stay below the cron interval (900s), otherwise ticks land a second or two short of `frequency` and skip every check. The cadence was raised from `*/5` because Workers Free caps cron CPU at 10ms while the worker needs ~50ms, so most 5-minute ticks were killed with `exceededCpu`.
 - Webhook delivery uses a retry queue with exponential backoff stored in D1. Per-website and global config in `wrangler.jsonc` `vars`.
 - Requests matching a file in `public/` are served by Workers Static Assets before the worker runs (`assets.run_worker_first` is false). All other paths (API, `/health`, 404s) fall through to the Go worker.
 - **No tests exist** in the repo.
@@ -48,6 +48,6 @@ Website uptime monitor deployed as a Cloudflare Worker. Written in Go, compiled 
 ## Environment & config
 
 - Env vars loaded from `wrangler.jsonc` `vars` at runtime via `cloudflare.Getenv()`, NOT from `.env` at build time.
-- `MONITOR_TIMEOUT_SEC` controls HTTP request timeout per website check (default 3s).
+- `MONITOR_TIMEOUT_SEC` bounds the HTTP request for each website check (deployed as `2`, code default `3`). It is enforced in `src/httpclient` via the platform's `AbortSignal.timeout()`, **not** via `context.WithTimeout` — `syumai/workers`'s `fetch` client discards the request context (no AbortSignal, and its promise wait never selects on `ctx.Done()`), so a context deadline there is inert. Webhook deliveries use a fixed 15s. Do not "simplify" this back to a context timeout, and do not reintroduce an `AbortController` driven by `setTimeout`/`time.Timer`: passing a `js.Func` to `setTimeout` never returns in this runtime, and a Go-timer abort makes workerd resolve the fetch with a synthetic `200`, so timeouts would be recorded as healthy checks.
 - `.env` / `.dev.vars*` are gitignored — only `.env.example` checked in.
 - Migration files in `migrations/` — sequential SQL files.

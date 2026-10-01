@@ -47,7 +47,7 @@ npx wrangler d1 create gomon
 "vars": {
   "D1_BINDING": "DB",
   "MIN_FREQUENCY": "",      // in seconds (default 240, keep below the cron interval)
-  "MONITOR_TIMEOUT_SEC": "", // HTTP timeout per check (default 3)
+  "MONITOR_TIMEOUT_SEC": "", // per-check HTTP deadline in seconds (default 3)
   "WEBHOOK_NOTIFY_ON_RECOVERY": "true",
   "WEBHOOK_MAX_ATTEMPTS": "3",
   "WEBHOOK_INITIAL_DELAY_SEC": "30",
@@ -74,6 +74,18 @@ npm start
 curl "http://127.0.0.1:8787/__scheduled"
 ```
 
+## ⏱ Scheduling & Timeouts
+
+Two timers drive GoMon, and both matter when sizing a deployment.
+
+**Cron cadence** is set in `wrangler.jsonc` under `triggers.crons`. On the Workers **Free** plan a cron trigger gets a **10ms CPU** budget, while the TinyGo-compiled worker needs roughly **50ms** to query D1 and dispatch checks. Most ticks are therefore killed with `exceededCpu`, which leaves `last_checked_at` stale rather than marking sites down. The shipped config uses `*/15 * * * *` to cut the killed invocations from ~288/day to ~96/day. On a paid plan the CPU budget is higher and a tighter cadence is fine.
+
+> `MIN_FREQUENCY` must stay **below** the cron interval. A site is checked when `last_checked_at = 0` or `now - last_checked_at >= frequency`, and ticks land a second or two past the interval, so a `frequency` equal to or above it can be skipped indefinitely.
+
+**Per-check HTTP deadline** is `MONITOR_TIMEOUT_SEC` (deployed as `2`, code default `3`). It bounds each site's health check and each webhook delivery attempt (webhooks use a fixed 15s). Exceeding it aborts the in-flight request, marks the site `down` with `request timed out`, and records the elapsed time — it does not stall the rest of the tick.
+
+Implementation note: the deadline is enforced by the platform's `AbortSignal.timeout()` in `src/httpclient`, **not** by `context.WithTimeout`. The `fetch` helper in `syumai/workers` discards the request context, so wrapping a call in `context.WithTimeout` silently has no effect. Two hand-rolled alternatives are known not to work in this runtime: passing a `js.Func` to `setTimeout` never returns, and driving an `AbortController` from a Go timer makes the runtime resolve the aborted fetch with a synthetic `200` — so a timeout would be recorded as a healthy check.
+
 ## 📂 Project Folder Structure
 
 ### Top Level Directory Layout
@@ -83,6 +95,7 @@ curl "http://127.0.0.1:8787/__scheduled"
 ├── public/               # static dashboard assets (Workers Static Assets)
 ├── src/                  # go packages
 │   ├── handlers/         # HTTP API handlers
+│   ├── httpclient/       # outbound fetch with enforced timeouts
 │   ├── models/           # data types & api contracts
 │   ├── storage/          # D1 persistence layer
 │   └── workers/          # monitoring & webhook logic
